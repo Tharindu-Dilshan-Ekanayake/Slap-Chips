@@ -16,8 +16,6 @@ export const localPlayer = {
   grounded: true,
   /** { x, z, ry } while sitting at a table, else null. */
   seat: null,
-  /** Epoch ms until which the avatar is "broken apart" after a loss. */
-  hiddenUntil: 0,
   /** Set on a teleport (respawn) so the camera jumps instead of swooping. */
   snapCamera: false,
   /** Bloxity emote playing on the local avatar: { clip, start } (seconds), or null. */
@@ -46,14 +44,20 @@ export const remoteSeats = new Map()
 /** Speech bubbles: id -> { text, until, version }. */
 export const bubbles = new Map()
 
-/** Remote players hidden by the loss effect: id -> epoch ms. */
-export const hiddenUntil = new Map()
-
 /** Virtual joystick + jump button, written by TouchControls. */
 export const touchInput = { x: 0, y: 0, jump: false }
 
-/** Requests for the particle system: { kind: 'confetti'|'break', x, y, z }. */
+/** Requests for the particle system: { kind: 'confetti'|'sparks', x, y, z }. */
 export const effectQueue = []
+
+/**
+ * Seated players' table actions, for their pose (see seatPose): id (SELF_ANCHOR for
+ * the local player) -> epoch ms each started — `eat`, `slapping` (with `dx`, `dz`
+ * towards the player being slapped and `arm`), `slap` (with `side`, which way the
+ * hit knocks them), `fly` (knocked out of the chair, towards `ax`, `az`) and
+ * `danceAt` (when the winner may start dancing).
+ */
+export const actionFx = new Map()
 
 /** Latest renderer stats, for the HUD perf readout and automated checks. */
 export const renderStats = { calls: 0, triangles: 0, textures: 0, geometries: 0, fps: 0 }

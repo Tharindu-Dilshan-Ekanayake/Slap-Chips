@@ -4,7 +4,7 @@ import { BoxGeometry, CanvasTexture, MeshBasicMaterial, MeshLambertMaterial, Pla
 import { useGame } from '../net/gameStore'
 import Instanced from './Instanced'
 import { fontReady, GAME_FONT } from './labels'
-import { DATA } from './layout'
+import { DATA, rotateXZ } from './layout'
 import { useSettings } from './quality'
 import { useDisposable } from './useDisposable'
 
@@ -15,11 +15,24 @@ const BOARD_Y = 4.1
 const TEX_W = 420
 const TEX_H = 512
 
-const FRAMES = DATA.leaderboards.map((lb) => ({ p: [lb.x, BOARD_Y, lb.z], s: [BOARD_W + 0.6, BOARD_H + 0.6, 0.4] }))
+// The boards stand in an arc on the north side, each turned to face the fountain.
+const FRAMES = DATA.leaderboards.map((lb) => ({
+  p: [lb.x, BOARD_Y, lb.z],
+  s: [BOARD_W + 0.6, BOARD_H + 0.6, 0.4],
+  ry: lb.ry,
+}))
+const CROWNS = DATA.leaderboards.map((lb) => ({
+  p: [lb.x, BOARD_Y + BOARD_H / 2 + 0.45, lb.z],
+  s: [BOARD_W + 1.1, 0.3, 0.7],
+  ry: lb.ry,
+}))
 const LEGS = DATA.leaderboards.flatMap((lb) =>
-  [-1, 1].map((side) => ({ p: [lb.x + side * 2.2, 0.5, lb.z], s: [0.5, 1, 0.5] })),
+  [-1, 1].map((side) => {
+    const [dx, dz] = rotateXZ(side * 2.2, 0, lb.ry)
+    return { p: [lb.x + dx, 0.5, lb.z + dz], s: [0.5, 1, 0.5], ry: lb.ry }
+  }),
 )
-const WOOD_PARTS = [...FRAMES, ...LEGS]
+const WOOD_PARTS = [...FRAMES, ...CROWNS, ...LEGS]
 
 /** How a board's number reads: "Lv 12", "3h 20m", or a plain count. */
 function formatValue(value, format) {
@@ -107,12 +120,9 @@ function Board({ def, geometry }) {
   }, [res, def.title, def.format, rows])
 
   return (
-    <mesh
-      geometry={geometry}
-      material={res.material}
-      position={[def.x, BOARD_Y, def.z + 0.21]}
-      visible={drawn}
-    />
+    <group position={[def.x, 0, def.z]} rotation={[0, def.ry || 0, 0]}>
+      <mesh geometry={geometry} material={res.material} position={[0, BOARD_Y, 0.235]} visible={drawn} />
+    </group>
   )
 }
 
@@ -122,7 +132,7 @@ export function Leaderboards() {
   const res = useDisposable(
     () => ({
       box: new BoxGeometry(1, 1, 1),
-      wood: new MeshLambertMaterial({ color: '#8a4f2a' }),
+      wood: new MeshLambertMaterial({ color: '#7a4526' }),
       face: new PlaneGeometry(BOARD_W, BOARD_H),
     }),
     [],

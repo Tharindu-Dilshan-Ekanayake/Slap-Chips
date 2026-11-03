@@ -12,6 +12,7 @@
  */
 
 import { usePlatform } from '../bloxity/platform'
+import { SLAP_IMPACT_MS } from '../game/seatPose'
 
 /** Loudest the mix gets at volume 100. */
 const MAX_GAIN = 0.9
@@ -278,7 +279,7 @@ export const sfx = {
     bell(G5, 0, 0.4, 0.15)
     bell(C6, 0.12, 0.7, 0.16)
   }),
-  /** Waiting for the answer: a short, building drum roll. */
+  /** A bite on its way: a short, building drum roll. */
   drum: play(() => {
     const hits = 9
     for (let i = 0; i < hits; i += 1) {
@@ -286,17 +287,30 @@ export const sfx = {
       thump(t, 150 + i * 6, 0.05 + i * 0.012)
     }
   }),
-  /** Answer: HIGHER, a rising "whoop" and an upward chime. */
-  higher: play(() => {
-    voice(330, 0, 0.28, { type: 'triangle', glide: 880, gain: 0.16, filter: 2500 })
-    bell(C6, 0.2, 0.4, 0.14)
-    bell(G6, 0.3, 0.7, 0.15)
+  /** A safe chip: three crisp crunches and a happy little "mm". */
+  crunch: play(() => {
+    for (const [t, f] of [[0, 3200], [0.09, 2600], [0.2, 3600]]) {
+      noise(t, 0.06, { freq: f, q: 1.4, gain: 0.32 })
+      noise(t, 0.03, { filter: 'highpass', freq: 6000, gain: 0.08 })
+    }
+    bell(E5, 0.32, 0.25, 0.08)
+    bell(G5, 0.4, 0.4, 0.09)
   }),
-  /** Answer: LOWER, a falling "whoop" and a downward chime. */
-  lower: play(() => {
-    voice(880, 0, 0.28, { type: 'triangle', glide: 300, gain: 0.16, filter: 2500 })
-    bell(G5, 0.2, 0.4, 0.14)
-    bell(C5, 0.3, 0.7, 0.15)
+  /** SLAP: a whoosh as the hand swings in, then a sharp smack with a thud under it. */
+  slap: play(() => {
+    const hit = SLAP_IMPACT_MS / 1000
+    noise(hit - 0.2, 0.2, { freq: 500, freqEnd: 2600, q: 0.9, gain: 0.07 })
+    noise(hit, 0.09, { freq: 2400, q: 0.6, gain: 0.55, reverb: 0.25 })
+    noise(hit, 0.04, { filter: 'highpass', freq: 5000, gain: 0.25 })
+    thump(hit, 140, 0.3)
+    // A cartoon "boing" as the head snaps aside.
+    voice(520, hit + 0.08, 0.3, { type: 'triangle', glide: 180, gain: 0.08, vibrato: 30 })
+  }),
+  /** Golden chip: a crunch, then a magical sparkle. */
+  golden: play(() => {
+    noise(0, 0.06, { freq: 3200, q: 1.4, gain: 0.28 })
+    ;[C6, E6, G6, C7, E6, C7].forEach((f, i) => bell(f, 0.12 + i * 0.06, 0.6, 0.11))
+    noise(0.12, 0.6, { filter: 'highpass', freq: 7000, freqEnd: 11000, gain: 0.04, reverb: 0.6 })
   }),
   /** Won the duel: a fanfare, a big chord and a cymbal shimmer. */
   win: play(() => {

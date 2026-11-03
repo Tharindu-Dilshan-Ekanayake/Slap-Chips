@@ -3,10 +3,17 @@ import DATA from '../../../shared/gameData.json'
 /**
  * World layout derived from shared/gameData.json, which the server also reads, so
  * table positions and seat checks can never disagree between the two.
+ *
+ * The lobby is a round snack plaza: a giant chip-bowl fountain in the middle, the
+ * ten duel tables in a ring around it (each turned so its players sit with their
+ * backs to the fountain), and around the outside the leaderboards (north), the
+ * chair shop (east), the emote stall (west) and the entrance arch (south).
  */
 
 export { DATA }
 export const TABLE = DATA.table
+export const CHIPS = DATA.chips
+export const CELLS = CHIPS.cols * CHIPS.rows
 export const WORLD_HALF = DATA.world.half
 export const SPAWN = DATA.world.spawn
 
@@ -20,54 +27,105 @@ export const SEATED_BACK = 0.12
  */
 export const DANCE_FORWARD = 0.75
 
-/** Chairs face -Z, towards their table. */
-export const SEAT_FACING = Math.PI
-
-export function seatPosition(tableId, index) {
-  const t = DATA.tables.find((x) => x.id === tableId)
-  if (!t) return null
-  return {
-    x: t.x + (index === 0 ? -TABLE.seatX : TABLE.seatX),
-    z: t.z + TABLE.seatZ,
-    ry: SEAT_FACING,
-  }
+/** World offset of a point given in an object's own frame (yaw `ry`, three.js convention). */
+export function rotateXZ(lx, lz, ry) {
+  const c = Math.cos(ry)
+  const s = Math.sin(ry)
+  return [lx * c + lz * s, -lx * s + lz * c]
 }
 
-export const SHOP_CHAIRS = DATA.chairs.filter((c) => c.shop)
+/** A point in a table's own frame (+Z towards its chairs) -> world [x, z]. */
+export function tableLocal(table, lx, lz) {
+  const [dx, dz] = rotateXZ(lx, lz, table.ry || 0)
+  return [table.x + dx, table.z + dz]
+}
 
-/** Chair shop row: display pedestals along the east side of the plaza. */
-export const CHAIR_SHOP = { x: 26.5, zMin: -13, zMax: 13 }
-/** The shop's two rows of pedestals (see gameData chairs[].shop). */
-export const CHAIR_ROWS = [24.6, 28.4]
+export const tableById = (id) => DATA.tables.find((t) => t.id === id) || null
+
+/**
+ * A seat: its chair position and the way the seated player faces (towards the
+ * table, i.e. the table's -Z).
+ */
+export function seatPosition(tableId, index) {
+  const t = tableById(tableId)
+  if (!t) return null
+  const [x, z] = tableLocal(t, index === 0 ? -TABLE.seatX : TABLE.seatX, TABLE.seatZ)
+  return { x, z, ry: (t.ry || 0) + Math.PI }
+}
+
+/* ---- Chips on the table ---------------------------------------------------------- */
+
+/** Size of one chip's square on a plate, and where each seat's plate sits. */
+export const CHIP_CELL = 0.4
+const PLATE_X = 0.9
+const PLATE_Z = 0.08
+
+/**
+ * Where chip `cell` of seat `plate`'s plate lies, in the table's frame. Cell 0 is
+ * the top-left one as seen by the duel camera (which looks along the table's +Z),
+ * so the 3x3 pads on screen match the plates on the table.
+ */
+export function chipLocal(plate, cell) {
+  const col = cell % CHIPS.cols
+  const row = Math.floor(cell / CHIPS.cols)
+  const cx = plate === 0 ? -PLATE_X : PLATE_X
+  return [cx + ((CHIPS.cols - 1) / 2 - col) * CHIP_CELL, PLATE_Z + ((CHIPS.rows - 1) / 2 - row) * CHIP_CELL]
+}
+
+export const plateCenterLocal = (plate) => [plate === 0 ? -PLATE_X : PLATE_X, PLATE_Z]
+export const PLATE_SIZE = [CHIPS.cols * CHIP_CELL + 0.1, CHIPS.rows * CHIP_CELL + 0.1]
+
+/* ---- Lobby -------------------------------------------------------------------------- */
+
+/**
+ * Heights of everything lying flat on the ground, far enough apart that no two ever
+ * z-fight (flicker), even in the distance: the plaza paving (in three layers where
+ * pieces overlap: rings, pads, paths), rugs, baked shadows, players' blob shadows
+ * and aura rings. Polygon offset alone can't separate them: it does nothing for a
+ * surface seen straight on.
+ */
+export const FLOOR = { plaza: 0.012, plazaStep: 0.012, rug: 0.06, shadow: 0.075, blob: 0.09, aura: 0.105 }
+
+/** The central fountain: a basin of this radius at the world origin. */
+export const FOUNTAIN = { radius: 4.4 }
+/** Paved plaza disc, and the lamp-post ring just inside its edge. */
+export const PLAZA_RADIUS = 18.6
+export const LAMP_RING = 17.6
+/** Lamp posts every 36 degrees, leaving the entrance path (due south) open. */
+export const LAMPS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => {
+  const a = (k * 36 * Math.PI) / 180
+  return [LAMP_RING * Math.sin(a), LAMP_RING * Math.cos(a)]
+})
+
+export const SHOP_CHAIRS = DATA.chairs.filter((c) => c.shop)
+/** The chair shop is an arc of pedestals on the east side. */
+export const CHAIR_SHOP = { x: 27.6, z: 0 }
 
 export const EMOTE_SHOP = DATA.emoteShop
 
-/** Voxel trees, only around the edge of the island so the play area stays clear. */
+/** The "how to play" board beside the entrance path, turned towards the walk in. */
+export const GUIDE_BOARD = { x: -10.5, z: 21.5, ry: 1.25 }
+/** A giant chip bag on the other side of the entrance. */
+export const CHIP_BAG = { x: 10.5, z: 21.5 }
+
+/** Voxel trees around the edge of the island, clear of the shops and boards. */
 export const TREES = [
-  [-27.5, -27.5], [-17, -28], [17, -28], [27.5, -27.5],
-  [-27.5, 27.5], [-15, 28], [15, 28], [27.5, 27.5],
+  [-27.5, -27.5], [27.5, -27.5], [-27.5, 27.5], [27.5, 27.5],
+  [-18.5, -28], [18.5, -28], [-28.5, -13], [-28.5, 13],
+  [-17, 28.5], [17, 28.5], [28.5, 22.5], [28.5, -22.5],
 ]
 
-/**
- * Paving as [x, z, width, depth] rectangles: the central plaza the desks stand
- * on, the walk up from spawn, and the floors of the two shops.
- */
-export const PATHS = [
-  [0, 1, 46, 22],
-  [0, 19, 5, 14],
-  [26.5, 0, 8.6, 26],
-  [-26.5, 1, 6, 10],
-  [0, -16, 22, 4],
+/** Flower planters lining the walk in from the spawn point: [x, z, width, depth]. */
+export const PLANTERS = [
+  [-4.6, 25, 1.3, 4.4],
+  [4.6, 25, 1.3, 4.4],
 ]
-
-/** A rug under each desk and its two chairs: [x, z, width, depth]. */
-export const RUGS = DATA.tables.map((t) => [t.x, t.z + 0.45, TABLE.width + 2.2, TABLE.depth + 3.2])
 
 /**
  * The welcome arch over the spawn path: pillars at ±ARCH.halfWidth. Tall enough
  * that the follow camera (~5 units up by default) passes under the beam.
  */
-export const ARCH = { z: 13.6, halfWidth: 3.4, height: 6 }
+export const ARCH = { z: 20.4, halfWidth: 3.4, height: 6 }
 
 /** Rocks along the beach, just outside the fence: [x, z, size]. */
 export const ROCKS = [
@@ -86,25 +144,43 @@ export const ISLANDS = [
 ]
 
 /**
- * Axis-aligned boxes the player can't walk through, in XZ.
- * @type {{ minX: number, maxX: number, minZ: number, maxZ: number }[]}
+ * What the player can't walk through, in XZ: turned boxes
+ * `{ x, z, hw, hd, c, s }` (half sizes, cos/sin of the yaw) and circles `{ x, z, r }`.
  */
 export const COLLIDERS = []
 
-const box = (x, z, w, d) =>
-  COLLIDERS.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 })
+const box = (x, z, w, d, ry = 0) =>
+  COLLIDERS.push({ x, z, hw: w / 2, hd: d / 2, c: Math.cos(ry), s: Math.sin(ry) })
 
-for (const t of DATA.tables) box(t.x, t.z, TABLE.width, TABLE.depth)
-for (const lb of DATA.leaderboards) box(lb.x, lb.z, 6, 0.6)
-for (const c of SHOP_CHAIRS) box(c.shop[0], c.shop[1], 2, 2)
+for (const t of DATA.tables) box(t.x, t.z, TABLE.width, TABLE.depth, t.ry)
+for (const lb of DATA.leaderboards) box(lb.x, lb.z, 6, 0.6, lb.ry)
+for (const c of SHOP_CHAIRS) box(c.shop[0], c.shop[1], 2, 2, Math.atan2(-c.shop[0], -c.shop[1]))
 box(EMOTE_SHOP.x, EMOTE_SHOP.z, 1.6, 5)
+box(GUIDE_BOARD.x, GUIDE_BOARD.z, 5.4, 0.5, GUIDE_BOARD.ry)
+box(CHIP_BAG.x, CHIP_BAG.z, 2.6, 1.8)
+for (const [x, z, w, d] of PLANTERS) box(x, z, w, d)
 for (const [x, z] of TREES) box(x, z, 1, 1)
+for (const [x, z] of LAMPS) box(x, z, 0.5, 0.5)
 for (const side of [-1, 1]) box(side * ARCH.halfWidth, ARCH.z, 1.5, 1.5)
+COLLIDERS.push({ x: 0, z: 0, r: FOUNTAIN.radius + 0.1 })
+
+/** A point `distance` closer to the plaza's centre than [x, z]. */
+function towardCentre(x, z, distance) {
+  const len = Math.hypot(x, z) || 1
+  return [x - (x / len) * distance, z - (z / len) * distance]
+}
 
 /** What the player can interact with by walking up to it and pressing E. */
 export const INTERACTABLES = [
-  ...DATA.tables.map((t) => ({ kind: 'table', id: t.id, x: t.x, z: t.z + 0.6, range: TABLE.sitRange })),
-  ...SHOP_CHAIRS.map((c) => ({ kind: 'chair', id: c.id, x: c.shop[0] - 1.6, z: c.shop[1], range: 2.6 })),
+  ...DATA.tables.map((t) => {
+    // Players walk up on the chair side (the plaza's inside).
+    const [x, z] = tableLocal(t, 0, 0.9)
+    return { kind: 'table', id: t.id, x, z, range: TABLE.sitRange }
+  }),
+  ...SHOP_CHAIRS.map((c) => {
+    const [x, z] = towardCentre(c.shop[0], c.shop[1], 1.7)
+    return { kind: 'chair', id: c.id, x, z, range: 2.4 }
+  }),
   { kind: 'emoteShop', id: 'emotes', x: EMOTE_SHOP.x + 1.6, z: EMOTE_SHOP.z, range: 3.5 },
 ]
 

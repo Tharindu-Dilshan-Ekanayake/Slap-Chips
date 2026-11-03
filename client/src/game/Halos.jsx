@@ -11,7 +11,7 @@ import {
 } from 'three'
 
 import { useGame } from '../net/gameStore'
-import { avatarAnchors, hiddenUntil, localPlayer, SELF_ANCHOR } from '../net/liveState'
+import { avatarAnchors, SELF_ANCHOR } from '../net/liveState'
 import { haloById, PLAYER_HEIGHT } from './layout'
 import { useDisposable } from './useDisposable'
 
@@ -100,7 +100,6 @@ export function Halos() {
     const gems = gemRef.current
     const outer = outerRef.current
     const t = clock.elapsedTime
-    const now = Date.now()
     let n = 0
     let g = 0
     let o = 0
@@ -109,8 +108,6 @@ export function Halos() {
       const { id, halo } = wearers[i]
       const anchor = avatarAnchors.get(id)
       if (!anchor || !halo || !isShown(anchor)) continue
-      // Hidden while a loser's avatar is "broken apart".
-      if (id === SELF_ANCHOR ? now < localPlayer.hiddenUntil : (hiddenUntil.get(id) || 0) > now) continue
 
       anchor.getWorldPosition(_pos)
       _obj.position.set(_pos.x, _pos.y + HALO_Y + Math.sin(t * 2 + i) * 0.04, _pos.z)

@@ -223,7 +223,7 @@ export function GameScene({ onReady }) {
         flat
         // Antialiasing is fixed when the WebGL context is created; every preset uses it.
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        camera={{ position: [0, 6, 36], fov: 60, far: settings.viewDistance + 100 }}
+        camera={{ position: [0, 6, 38], fov: 60, far: settings.viewDistance + 100 }}
         onCreated={onCreated}
       >
         <PerformanceMonitor onDecline={drop} bounds={() => [45, 1000]} flipflops={4} />

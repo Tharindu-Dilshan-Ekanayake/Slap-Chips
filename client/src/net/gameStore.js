@@ -28,13 +28,25 @@ export const useGame = create((set, get) => ({
   /** null | 'shop' | 'items' | 'rewards' | 'quests' | 'help' | 'settings' */
   modal: null,
   shopTab: 'chairs',
-  /** Duel outcome banner for this player: { win, reward, theirNumber, until }. */
+  /** Duel outcome banner for this player: { win, reward, reason, theirSlaps, until }. */
   result: null,
   /**
-   * The guess being revealed at this table: { mine, n, answer, until }. `answer` is
-   * null during the suspense, then 'higher' | 'lower' | 'correct'.
+   * The bite being revealed at this table: { mine, cell, kind, hearts, until }. `kind`
+   * is null during the drumroll, then 'safe' | 'slap' | 'golden'; `hearts` is what
+   * the biter has left.
    */
   reveal: null,
+  /** Chips picked so far while hiding slaps (cells of your own plate), before locking in. */
+  draft: [],
+  /**
+   * The big "YOUR TURN!" splash: { at, until } (epoch ms). It waits for the last
+   * bite's reveal card to finish, so it appears just as you can pick a chip.
+   */
+  turnSplash: null,
+  /** The "Quit the duel?" popup is open (only ever during the eating phase). */
+  quitAsk: false,
+  /** Full-screen flash for a slap / golden chip at your table: { kind, at, delay, until } (ms). */
+  flash: null,
   /** Level-up celebration: { level, reward, title, until }. */
   levelUp: null,
   emotesOpen: true,
@@ -44,6 +56,16 @@ export const useGame = create((set, get) => ({
   setShopTab: (shopTab) => set({ shopTab }),
   toggleEmotes: () => set({ emotesOpen: !get().emotesOpen }),
 
+  /**
+   * Picks or unpicks a chip to hide a slap in. Picking one more than allowed drops
+   * the oldest pick, so a tap always does something.
+   */
+  toggleDraft: (cell, max) => {
+    const draft = get().draft
+    if (draft.includes(cell)) set({ draft: draft.filter((c) => c !== cell) })
+    else set({ draft: [...(draft.length >= max ? draft.slice(1) : draft), cell] })
+  },
+
   pushToast: (text) => {
     const id = ++toastId
     set({ toasts: [...get().toasts.slice(-3), { id, text }] })
@@ -51,4 +73,4 @@ export const useGame = create((set, get) => ({
   },
 }))
 
-export const isPlayingPhase = (phase) => phase === 'choosing' || phase === 'guessing'
+export const isPlayingPhase = (phase) => phase === 'hiding' || phase === 'eating'

@@ -30,6 +30,9 @@ const skyVertexShader = /* glsl */ `
   void main() {
     vDirection = position;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    // Pinned just inside the far plane: the dome is never clipped away on presets
+    // with a short view distance, and is always behind everything else.
+    gl_Position.z = gl_Position.w * 0.99999;
   }
 `
 

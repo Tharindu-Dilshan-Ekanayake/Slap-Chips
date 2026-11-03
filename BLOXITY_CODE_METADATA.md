@@ -20,8 +20,9 @@ leaderboards:
     reset: none
 notApplicable:
   deathScreen: >-
-    A player cannot die. Losing a duel shows a short "break apart" effect and sends
-    the player back to the lobby; it is not a death (confirmed by the developer).
+    A player cannot die. Losing a duel shows a short "knocked out" slump in the
+    chair and sends the player back to the lobby; it is not a death (confirmed by
+    the developer).
   rewardedAds: >-
     The game has no reward earned by watching an ad yet. Add a "watch ad" reward
     (e.g. open the mystery gift early) before turning rewarded ads on.

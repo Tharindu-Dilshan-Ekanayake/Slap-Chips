@@ -2,24 +2,27 @@ import { useLayoutEffect, useMemo } from 'react'
 import {
   BoxGeometry,
   CanvasTexture,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   MeshPhongMaterial,
   PlaneGeometry,
   SRGBColorSpace,
 } from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
-import { ISLANDS, PATHS, ROCKS, RUGS, TREES, WORLD_HALF } from './layout'
+import { FLOOR, ISLANDS, ROCKS, TREES, WORLD_HALF } from './layout'
 import Leaderboards from './Leaderboards'
+import { createPlazaGeometry, LAMP_BULBS, lobbyBoxes, RUG_ITEMS } from './lobby'
 import { useSettings } from './quality'
 import { FENCE, GROUND, OCEAN } from './sceneStyle'
 import Shops from './Shops'
 import Tables from './Tables'
-import { createStudTexture, createWorldBoxGeometry, createWorldPlaneGeometry } from './textures'
+import { createStudTexture, createWorldBoxGeometry } from './textures'
 import { archBoxes } from './arch'
 import { treeBoxes } from './trees'
 import ContactShadows from './ContactShadows'
 import ArchSign from './ArchGate'
+import Fountain from './Fountain'
+import GuideBoard from './GuideBoard'
 import Instanced from './Instanced'
 import { mergedBoxes } from './instancing'
 import { useDisposable } from './useDisposable'
@@ -54,9 +57,6 @@ function fenceRails(x1, z1, x2, z2) {
 const H = WORLD_HALF
 const SAND = '#f3d98d'
 
-/** Rug colours, alternating along each row of desks. */
-const RUG_COLORS = ['#c0392b', '#2c5aa0']
-
 /**
  * A rug pattern in light tones (instance colour tints it): a plain field, a
  * patterned border band and a thin inner line. 128 px, one shared texture.
@@ -88,16 +88,6 @@ function createRugTexture() {
   return texture
 }
 
-/** Every stone path as one flat geometry with world-scaled UVs. */
-function createPathGeometry() {
-  const parts = PATHS.map(([x, z, w, d]) =>
-    createWorldPlaneGeometry(w, d, GROUND_TILE).rotateX(-Math.PI / 2).translate(x, 0, z),
-  )
-  const merged = mergeGeometries(parts)
-  for (const g of parts) g.dispose()
-  return merged
-}
-
 /** Small deterministic hash so decoration varies but never between reloads. */
 const vary = (i, k) => {
   const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453
@@ -105,8 +95,9 @@ const vary = (i, k) => {
 }
 
 /**
- * All the box-built scenery (beach, distant islands, trees, bushes and flowers,
- * rocks, the welcome arch) as instances of one unit cube: one draw call.
+ * All the box-built scenery (beach, distant islands, trees, rocks, the welcome
+ * arch, and the plaza's lamp posts, bunting, planters and props) as instances of one
+ * unit cube: one draw call.
  */
 function sceneryBoxes() {
   const items = [
@@ -122,6 +113,7 @@ function sceneryBoxes() {
     items.push({ p: [x, -0.1 + size * 0.25, z], s: [size, size * 0.7, size * 0.9], ry: vary(i, 9) * 3, c: i % 2 ? '#8c9096' : '#a3a6ab' })
   })
   items.push(...archBoxes())
+  items.push(...lobbyBoxes())
   return items
 }
 const FENCES = [
@@ -131,21 +123,20 @@ const FENCES = [
   [H, -H, H, H],
 ]
 
+// Static: built once at module load.
+const SCENERY = sceneryBoxes()
 
 /**
- * The island: a lime studded baseplate fenced in on all sides, ringed by ocean, with
- * voxel trees around the edge and smaller islands on the horizon.
+ * The island: a grassy studded baseplate fenced in on all sides, ringed by ocean,
+ * with the round snack plaza in the middle (see layout.js and lobby.js), voxel trees
+ * around the edge and smaller islands on the horizon.
  *
  * Repeated props are instanced and multi-part props are merged, so the whole
- * landscape is a dozen draw calls.
+ * landscape is a dozen or so draw calls.
  *
  * @param {{ extras?: 'off' | 'warming' | 'on' }} props `extras` controls the shops and
  *   leaderboards, which GameScene holds back until the game is playable.
  */
-// Static: built once at module load.
-const SCENERY = sceneryBoxes()
-const RUG_ITEMS = RUGS.map(([x, z, w, d], i) => ({ p: [x, 0.02, z], s: [w, 1, d], c: RUG_COLORS[i % 2] }))
-
 export function World({ extras = 'on' }) {
   const settings = useSettings()
   const shadows = settings.shadows
@@ -165,16 +156,19 @@ export function World({ extras = 'on' }) {
       post: new MeshLambertMaterial({ color: FENCE.post }),
       postGeometry: new BoxGeometry(0.3, FENCE_HEIGHT, 0.3),
       railGeometry: mergedBoxes(FENCES.flatMap((f) => fenceRails(...f))),
-      pathTexture: createStudTexture({ base: '#e3dccb', alt: '#d6cdb7', size: 256 }),
-      pathGeometry: createPathGeometry(),
+      // White tiles: the plaza's vertex colours paint them.
+      plazaTexture: createStudTexture({ base: '#ffffff', alt: '#f2f2f2', size: 256 }),
+      plazaGeometry: createPlazaGeometry(GROUND_TILE),
       rugTexture: createRugTexture(),
       rugGeometry: new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+      bulb: new MeshBasicMaterial({ color: '#fff3b0' }),
     }
   }, [])
-  const pathMaterial = useDisposable(
+  const plazaMaterial = useDisposable(
     () =>
       new MeshLambertMaterial({
-        map: res.pathTexture,
+        map: res.plazaTexture,
+        vertexColors: true,
         // Sits just above the baseplate; the offset stops distant flicker.
         polygonOffset: true,
         polygonOffsetFactor: -1,
@@ -193,7 +187,7 @@ export function World({ extras = 'on' }) {
   )
 
   useLayoutEffect(() => {
-    for (const t of [res.groundTexture, res.pathTexture]) {
+    for (const t of [res.groundTexture, res.plazaTexture]) {
       t.anisotropy = settings.anisotropy
       t.needsUpdate = true
     }
@@ -206,12 +200,15 @@ export function World({ extras = 'on' }) {
       <mesh geometry={res.baseGeometry} material={res.ground} position={[0, -0.5, 0]} receiveShadow />
       <mesh geometry={res.oceanGeometry} material={res.ocean} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.7, 0]} />
 
-      <mesh geometry={res.pathGeometry} material={pathMaterial} position={[0, 0.01, 0]} receiveShadow />
+      <mesh geometry={res.plazaGeometry} material={plazaMaterial} position={[0, FLOOR.plaza, 0]} receiveShadow />
       <Instanced geometry={res.rugGeometry} material={rugMaterial} items={RUG_ITEMS} receiveShadow />
       <Instanced geometry={res.box} material={res.tinted} items={SCENERY} castShadow={shadows} receiveShadow />
+      <Instanced geometry={res.box} material={res.bulb} items={LAMP_BULBS} />
       <Instanced geometry={res.postGeometry} material={res.post} items={posts} castShadow={shadows} />
       <mesh geometry={res.railGeometry} material={res.wood} castShadow={shadows} />
       <ArchSign />
+      <Fountain />
+      <GuideBoard />
       {/* Realtime shadows are off on LOW: soft baked ones keep the depth. */}
       {!shadows && <ContactShadows />}
 

@@ -24,7 +24,7 @@ import {
   createThroneGeometry,
   cushionColor,
 } from './furniture'
-import { CHAIR_ROWS, EMOTE_SHOP, RARITY_AURA, RARITY_COLORS, SHOP_CHAIRS } from './layout'
+import { CHAIR_SHOP, EMOTE_SHOP, RARITY_AURA, RARITY_COLORS, SHOP_CHAIRS } from './layout'
 import { useSettings } from './quality'
 import { useDisposable } from './useDisposable'
 
@@ -146,7 +146,7 @@ const SHOP_AURAS = SHOP_CHAIRS.map((c) => ({
 }))
 
 /**
- * The chair shop (pedestals down the east side of the plaza, each with a turning
+ * The chair shop (an arc of pedestals on the east side of the plaza, each with a turning
  * chair in a glowing rarity aura) and the emote shop stall on the west side. Walk up
  * and press E — see InteractPrompt.
  */
@@ -171,13 +171,17 @@ export function Shops() {
     }
   }, [])
 
-  // Two tiers: a stone base and a slab trimmed in the chair's rarity colour.
+  // Two tiers: a stone base and a slab trimmed in the chair's rarity colour, each
+  // turned to face the fountain along the shop's arc.
   const pedestals = useMemo(
     () =>
-      SHOP_CHAIRS.flatMap((c) => [
-        { p: [c.shop[0], 0.19, c.shop[1]], s: [2, 0.38, 2], c: '#b9bec6' },
-        { p: [c.shop[0], 0.44, c.shop[1]], s: [1.7, 0.12, 1.7], c: RARITY_COLORS[c.rarity] },
-      ]),
+      SHOP_CHAIRS.flatMap((c) => {
+        const ry = Math.atan2(-c.shop[0], -c.shop[1])
+        return [
+          { p: [c.shop[0], 0.19, c.shop[1]], s: [2, 0.38, 2], c: '#b9bec6', ry },
+          { p: [c.shop[0], 0.44, c.shop[1]], s: [1.7, 0.12, 1.7], c: RARITY_COLORS[c.rarity], ry },
+        ]
+      }),
     [],
   )
 
@@ -194,7 +198,7 @@ export function Shops() {
           { text: 'CHAIRS 🪑', size: 56, color: '#4fd8ff' },
           { text: 'Walk up & press E', size: 26 },
         ]}
-        position={[CHAIR_ROWS[1] + 1.8, 4.8, 0]}
+        position={[CHAIR_SHOP.x, 5.2, CHAIR_SHOP.z]}
         height={0.7}
         scale={2}
       />

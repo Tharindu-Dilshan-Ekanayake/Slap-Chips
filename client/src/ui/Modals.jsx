@@ -546,11 +546,12 @@ function QuestsModal({ profile }) {
 
 const HELP_STEPS = [
   ['🚶', 'Walk to a table', 'Use WASD (or the joystick on phones). Walk up to a table and press E (or tap "Play").'],
-  ['🤔', 'Pick a secret number', 'When a second player sits down, you both pick a number from 1 to 100. Keep it secret!'],
-  ['🎯', 'Take turns guessing', "Guess your opponent's number. After each guess you see HIGHER ⬆ or LOWER ⬇. Wrong numbers get crossed out."],
-  ['🏆', 'First to guess wins', `Guess right first to win $${DATA.winReward}. Even if you lose, you get $${DATA.lossReward} and XP for playing.`],
-  ['❓', 'Need help?', `Use a Hint ($${DATA.powers.hint}) to narrow it down, or Reveal ($${DATA.powers.reveal}) to see their number.`],
-  ['⭐', 'Level up', 'Every duel gives XP. Each new level pays cash, and some unlock cool titles for your name.'],
+  ['🤫', 'Hide your slaps', `When a second player sits down, you each hide ${DATA.chips.slaps} slaps in the chips on your own plate. Keep them secret!`],
+  ['😋', 'Take turns eating', "On your turn, pick a chip from your opponent's plate and eat it. A safe chip goes CRUNCH."],
+  ['🖐️', "Don't get slapped", `Bite into a hidden slap and your opponent slaps you: you lose a heart. Bite all ${DATA.chips.slaps} of their slaps and you're OUT!`],
+  ['🏆', 'Win the duel', `The first player to bite all ${DATA.chips.slaps} slaps loses. The other wins $${DATA.winReward}. Even if you lose, you get $${DATA.lossReward} and XP for playing.`],
+  ['🏃', 'No quitting!', `Quit a duel and you lose $${DATA.forfeit.penalty} to your opponent, and they slap you ${DATA.forfeit.slaps} times before you go.`],
+  ['✨', 'Golden chip', `One safe chip on every plate is secretly golden: eat it for a $${DATA.chips.goldenCash} bonus.`],  ['⭐', 'Level up', 'Every duel gives XP. Each new level pays cash, and some unlock cool titles for your name.'],
   ['📜', 'Quests & gifts', 'Finish 3 daily quests, open a free gift every 10 minutes, and claim your daily reward.'],
   ['🛍️', 'Spend your cash', 'Buy chairs and thrones, glowing auras, titles and emotes in the Shop. Show them off!'],
   ['🔥', 'Win streaks', 'Win in a row for bonus cash at 3, 5 and 10 wins. Get on the leaderboards!'],
@@ -559,7 +560,7 @@ const HELP_STEPS = [
 /** "How to play" in plain English. Opens by itself on a player's first visit. */
 function HelpModal() {
   return (
-    <Frame title="How to Play 🤔">
+    <Frame title="How to Play 🖐️">
       {HELP_STEPS.map(([icon, title, text], i) => (
         <div key={title} className="flex items-start gap-3 rounded-xl border-[3px] border-black/50 bg-[#123540] px-3 py-2">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.8rem]">{icon}</span>

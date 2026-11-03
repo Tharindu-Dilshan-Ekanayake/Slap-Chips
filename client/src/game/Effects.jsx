@@ -1,24 +1,26 @@
 import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useRef } from 'react'
-import { BoxGeometry, Color, DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Object3D, PlaneGeometry } from 'three'
+import { Color, DoubleSide, MeshBasicMaterial, Object3D, OctahedronGeometry, PlaneGeometry } from 'three'
 
 import { effectQueue } from '../net/liveState'
 import { useDisposable } from './useDisposable'
 
 /**
- * Pooled particle effects: confetti over a duel's winner, and the loser's body
- * "breaking apart" into blocks. Fixed-size pools, preallocated typed arrays, one
- * instanced draw call per effect; nothing is allocated per frame or per spawn.
+ * Pooled particle effects: confetti over a duel's winner, and little stars where a
+ * slap lands (or a golden chip is found). Fixed-size pools, preallocated typed
+ * arrays, one instanced draw call per effect; nothing is allocated per frame or per
+ * spawn.
  *
  * Only mounted on presets with particles enabled (see GameScene).
  */
 
 const CONFETTI = 160
-const PIECES = 32
+/** Impact stars from a slap (and a golden chip's glitter). */
+const SPARKS = 48
 const GRAVITY = 9
 
 const CONFETTI_COLORS = ['#ff3b3b', '#ffb21e', '#ffee32', '#3bff6f', '#33c8ff', '#b14dff', '#ff4fb8']
-const PIECE_COLORS = ['#1c1c1c', '#f2f2f2', '#2b4fa8', '#e8b98f']
+const SPARK_COLORS = ['#fff5a8', '#ffffff', '#ffd23d', '#ff8a3d']
 
 const _obj = new Object3D()
 const _color = new Color()
@@ -96,15 +98,15 @@ function step(pool, mesh, dt, drag, floor) {
 
 export function Effects() {
   const confettiRef = useRef(null)
-  const piecesRef = useRef(null)
-  const pools = useRef({ confetti: createPool(CONFETTI), pieces: createPool(PIECES) })
+  const sparksRef = useRef(null)
+  const pools = useRef({ confetti: createPool(CONFETTI), sparks: createPool(SPARKS) })
 
   const res = useDisposable(
     () => ({
       confettiGeometry: new PlaneGeometry(0.16, 0.09),
       confettiMaterial: new MeshBasicMaterial({ side: DoubleSide }),
-      pieceGeometry: new BoxGeometry(0.28, 0.28, 0.28),
-      pieceMaterial: new MeshLambertMaterial(),
+      sparkGeometry: new OctahedronGeometry(0.07),
+      sparkMaterial: new MeshBasicMaterial(),
     }),
     [],
   )
@@ -113,29 +115,29 @@ export function Effects() {
     for (let i = 0; i < CONFETTI; i += 1) {
       confettiRef.current.setColorAt(i, _color.set(CONFETTI_COLORS[i % CONFETTI_COLORS.length]))
     }
-    for (let i = 0; i < PIECES; i += 1) {
-      piecesRef.current.setColorAt(i, _color.set(PIECE_COLORS[i % PIECE_COLORS.length]))
+    for (let i = 0; i < SPARKS; i += 1) {
+      sparksRef.current.setColorAt(i, _color.set(SPARK_COLORS[i % SPARK_COLORS.length]))
     }
     confettiRef.current.visible = false
-    piecesRef.current.visible = false
+    sparksRef.current.visible = false
   }, [])
 
   useFrame((_state, delta) => {
     const dt = Math.min(delta, 0.05)
-    const { confetti, pieces } = pools.current
+    const { confetti, sparks } = pools.current
     while (effectQueue.length) {
       const e = effectQueue.shift()
       if (e.kind === 'confetti') spawn(confetti, 80, e.x, e.y, e.z, 4, 4)
-      else spawn(pieces, 10, e.x, e.y, e.z, 3, 3)
+      else spawn(sparks, 14, e.x, e.y, e.z, 2.6, 1.4)
     }
     step(confetti, confettiRef.current, dt, 1.5, 0.02)
-    step(pieces, piecesRef.current, dt, 0, 0.14)
+    step(sparks, sparksRef.current, dt, 2.5, 0.9)
   })
 
   return (
     <>
       <instancedMesh ref={confettiRef} args={[res.confettiGeometry, res.confettiMaterial, CONFETTI]} frustumCulled={false} />
-      <instancedMesh ref={piecesRef} args={[res.pieceGeometry, res.pieceMaterial, PIECES]} frustumCulled={false} />
+      <instancedMesh ref={sparksRef} args={[res.sparkGeometry, res.sparkMaterial, SPARKS]} frustumCulled={false} />
     </>
   )
 }

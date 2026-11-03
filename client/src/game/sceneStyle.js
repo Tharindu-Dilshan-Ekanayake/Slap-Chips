@@ -1,6 +1,6 @@
 /**
- * The scene's whole look in one place: a bright toy-brick world with a saturated blue
- * sky, lime studded baseplate, tan checker brick walls and orange wooden fences.
+ * The scene's whole look in one place: a bright toy-brick world with a blue sky
+ * warming to peach at the horizon, a grassy studded baseplate and orange wooden fences.
  *
  * Colours are sRGB hex, exactly as you would pick them in an image editor.
  *
@@ -12,11 +12,11 @@
 
 export const SKY = {
   /** Straight up. */
-  top: '#2a8af5',
-  /** At eye level. Fog uses the same colour so distant ground melts into the sky. */
-  horizon: '#86c8fb',
+  top: '#3b86ee',
+  /** At eye level: a warm peach glow. Fog uses the same colour so distant ground melts into the sky. */
+  horizon: '#ffd9c0',
   /** Lower = the deep blue reaches further down towards the horizon. */
-  exponent: 0.3,
+  exponent: 0.42,
 }
 
 /** Haze at the horizon. Distances scale with the quality preset's view distance. */
@@ -39,10 +39,10 @@ export const OCEAN = {
   color: '#2bbff2',
 }
 
-/** Neon lime baseplate, two shades in a checker. */
+/** Fresh grass baseplate, two shades in a checker. */
 export const GROUND = {
-  base: '#5cee30',
-  alt: '#52de2b',
+  base: '#5ed94a',
+  alt: '#54cb41',
 }
 
 /** Tan checker brick for the boundary walls. */

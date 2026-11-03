@@ -26,7 +26,7 @@ import { useDisposable } from './useDisposable'
  *
  * The structure (plinths, banded pillars, beam, crown, flags) is plain boxes, added
  * to the world's shared scenery mesh by archBoxes() in arch.js, so it costs no draw
- * calls of its own. The marquee sign and the "1" / "100" pillar plaques are one mesh with
+ * calls of its own. The marquee sign and the slap / chip pillar plaques are one mesh with
  * one atlas texture: 1 draw call. The bulbs "chase" by swapping between two
  * pre-drawn textures a few times a second, so nothing is redrawn or re-uploaded
  * after start-up.
@@ -93,7 +93,7 @@ function drawAtlas(canvas, phase) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.lineJoin = 'round'
-  const text = 'Guess My Number'
+  const text = 'Slap Chips'
   const tw = ctx.measureText(text).width
   ctx.lineWidth = size * 0.2
   ctx.strokeStyle = '#120720'
@@ -107,22 +107,20 @@ function drawAtlas(canvas, phase) {
   ctx.fillStyle = phase ? '#ffffff' : '#ffe84d'
   ctx.fillText('★', w / 2 + tw / 2 + size * 0.55, h * 0.5)
 
-  // ---- Pillar plaques: "1" and "100", the range you guess in ----
+  // ---- Pillar plaques: a slap and a chip ----
   const py = BOARD_PX + 8
-  ;['1', '100'].forEach((label, k) => {
+  ;['🖐️', '🥔'].forEach((icon, k) => {
     const px = 8 + k * (PLAQUE_PX + 16)
     roundRect(ctx, px, py, PLAQUE_PX, PLAQUE_PX, 16)
-    ctx.fillStyle = '#ffd92e'
+    ctx.fillStyle = k ? '#ffd92e' : '#ff5a5a'
     ctx.fill()
     ctx.lineWidth = 6
     ctx.strokeStyle = '#1b1b1b'
     ctx.stroke()
-    ctx.font = `700 ${label.length > 1 ? 52 : 74}px ${GAME_FONT}`
-    ctx.lineWidth = 9
-    ctx.strokeStyle = '#1b1b1b'
-    ctx.strokeText(label, px + PLAQUE_PX / 2, py + PLAQUE_PX / 2 + 4)
+    // Emoji are filled only: an outline would draw a box around the glyph.
+    ctx.font = `64px ${GAME_FONT}`
     ctx.fillStyle = '#ffffff'
-    ctx.fillText(label, px + PLAQUE_PX / 2, py + PLAQUE_PX / 2 + 4)
+    ctx.fillText(icon, px + PLAQUE_PX / 2, py + PLAQUE_PX / 2 + 4)
   })
 }
 

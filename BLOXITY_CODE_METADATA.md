@@ -1,5 +1,5 @@
 ---
-gameSlug: guess-my-number
+gameSlug: slap-chips
 clientDir: client
 buildCommand: npm ci && npm run build
 distDir: client/dist
@@ -18,10 +18,21 @@ leaderboards:
     order: desc
     mode: best
     reset: none
+  - id: level
+    label: Level
+    order: desc
+    mode: best
+    reset: none
+  - id: playtime
+    label: Minutes Played
+    order: desc
+    mode: sum
+    reset: none
 notApplicable:
   deathScreen: >-
-    A player cannot die. Losing a duel shows a short "break apart" effect and sends
-    the player back to the lobby; it is not a death (confirmed by the developer).
+    A player cannot die. Losing a duel shows a short "knocked out" slump in the
+    chair and sends the player back to the lobby; it is not a death (confirmed by
+    the developer).
   rewardedAds: >-
     The game has no reward earned by watching an ad yet. Add a "watch ad" reward
     (e.g. open the mystery gift early) before turning rewarded ads on.

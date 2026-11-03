@@ -5,7 +5,7 @@ import { sfx } from '../audio/sfx'
 import { isPlayingPhase, useGame } from '../net/gameStore'
 import { money, useNow } from './format'
 
-const HELP_SEEN_KEY = 'gmn-seen-help'
+const HELP_SEEN_KEY = 'slapchips-seen-help'
 
 const open = (modal, tab) => {
   sfx.click()

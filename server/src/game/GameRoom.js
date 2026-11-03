@@ -117,7 +117,7 @@ class GameRoom extends Room {
     const session = this.sessions.get(client.sessionId)
     if (!session) return
     const now = Date.now()
-    session.seat?.table.leave(session, now)
+    session.seat?.table.leave(session, now, { gone: true })
     session.close(now)
     profiles.release(session.profile)
     this.sessions.delete(client.sessionId)
@@ -170,6 +170,24 @@ class GameRoom extends Room {
     void flushScores()
   }
 
+  /** Extra cash outside the win/loss rewards (the golden chip, a quitter's penalty). Returns it. */
+  bonusCash(session, amount, now) {
+    session.profile.cash += amount
+    profiles.markDirty(session.profile)
+    session.pushProfile(now)
+    return amount
+  }
+
+  /** Takes up to `amount` from a player (never below $0). Returns what was taken. */
+  takeCash(session, amount, now) {
+    const taken = Math.min(amount, session.profile.cash)
+    if (taken <= 0) return 0
+    session.profile.cash -= taken
+    profiles.markDirty(session.profile)
+    session.pushProfile(now)
+    return taken
+  }
+
   questEvent(session, event, now) {
     profiles.addQuestEvent(session.profile, event, 1, now)
     session.pushProfile(now)
@@ -183,8 +201,11 @@ class GameRoom extends Room {
     return this.tables.find((t) => t.id === id) || null
   }
 
-  /** Awards a win. Returns the cash granted. */
-  recordWin(session, guesses, now) {
+  /**
+   * Awards a win. `flawless`: won a finished duel without losing a heart.
+   * Returns the cash granted.
+   */
+  recordWin(session, { flawless = false } = {}, now) {
     const p = session.profile
     const has = (pass) => p.passes.includes(pass)
     const cash = DATA.winReward * (profiles.isWeekend(now) ? 2 : 1) * (has('cash2x') ? 2 : 1)
@@ -196,7 +217,7 @@ class GameRoom extends Room {
     p.bestStreak = Math.max(p.bestStreak, p.streak)
     profiles.addQuestEvent(p, 'play', 1, now)
     profiles.addQuestEvent(p, 'win', 1, now)
-    if (guesses <= 3) profiles.addQuestEvent(p, 'quickwin', 1, now)
+    if (flawless) profiles.addQuestEvent(p, 'flawless', 1, now)
     if (p.streak >= 3) profiles.addQuestEvent(p, 'streak3', 1, now)
 
     // Win-streak milestones pay a bonus, announced to the whole server.
@@ -236,11 +257,11 @@ class GameRoom extends Room {
    * A lost duel still pays a little (and XP), so every game moves you forward.
    * Quitting or timing out pays nothing. Returns the cash given.
    */
-  recordLoss(session, now, reason = 'guessed') {
+  recordLoss(session, now, reason = 'slapped') {
     const p = session.profile
     p.streak = 0
     profiles.addQuestEvent(p, 'play', 1, now)
-    const finished = reason === 'guessed'
+    const finished = reason === 'slapped'
     const cash = finished ? DATA.lossReward * (profiles.isWeekend(now) ? 2 : 1) : 0
     p.cash += cash
     profiles.markDirty(p)

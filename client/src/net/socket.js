@@ -3,18 +3,20 @@ import { Callbacks, Client } from '@colyseus/sdk'
 import { sfx } from '../audio/sfx'
 import { boxityEnv } from '../bloxity/env'
 import { loadEmoteCatalog, onPlatformEvent, platform } from '../bloxity/platform'
-import { DATA, seatPosition, SPAWN } from '../game/layout'
+import { DATA, SEATED_BACK, seatPosition, SPAWN } from '../game/layout'
 import { getSettings } from '../game/quality'
+import { SLAP_IMPACT_MS, SLAPPING_MS } from '../game/seatPose'
 import { useGame } from './gameStore'
 import {
+  actionFx,
   bubbles,
   effectQueue,
-  hiddenUntil,
   localPlayer,
   pushRemote,
   remoteEmotes,
   remotes,
   remoteSeats,
+  SELF_ANCHOR,
   setBubble,
 } from './liveState'
 
@@ -38,9 +40,16 @@ const ROOM_NAME = DATA.bloxity.roomName
 const HOSTING_ID = import.meta.env.VITE_BLOXITY_HOSTING_ID || ''
 const POS_INTERVAL_MS = 100
 const HEARTBEAT_MS = 1000
-const LOSS_HIDE_MS = 2200
-/** How long the Higher / Lower answer stays on screen. */
+/** How long a bite's outcome (crunch / SLAP) stays on screen. */
 const REVEAL_HOLD_MS = 1700
+/** Roughly where a seated player's head is. */
+const SEATED_HEAD_Y = 1.3
+/** A knockout's result waits for the slap to land and the loser to fly out of their chair. */
+const RESULT_AFTER_SLAP_MS = SLAP_IMPACT_MS + 900
+/** How far back from the table (against sideways 1) a knocked-out player flies. */
+const FLY_BACK = 0.45
+/** How long the "YOUR TURN!" splash stays up. */
+const TURN_SPLASH_MS = 1300
 /** A cold start can take ~45 s; stop retrying after this long without a room. */
 const GIVE_UP_MS = 60000
 /** Players already in the room when we join get playerInRoom, later ones playerJoined. */
@@ -234,10 +243,10 @@ function resetWorld() {
   remoteSeats.clear()
   remoteEmotes.clear()
   bubbles.clear()
-  hiddenUntil.clear()
+  actionFx.clear()
   localPlayer.seat = null
   localPlayer.emote = null
-  useGame.setState({ players: {}, tables: {}, match: null })
+  useGame.setState({ players: {}, tables: {}, match: null, draft: [], reveal: null })
 }
 
 /** Wires a freshly joined room's state callbacks and messages into the client. */
@@ -410,7 +419,7 @@ function removePlayer(id) {
   remoteEmotes.delete(id)
   remoteSeats.delete(id)
   bubbles.delete(id)
-  hiddenUntil.delete(id)
+  actionFx.delete(id)
   useGame.setState((s) => {
     const players = { ...s.players }
     delete players[id]
@@ -420,12 +429,19 @@ function removePlayer(id) {
 
 /** Mirrors who is sitting where (and who is dancing after a win) for remote players' pose. */
 function indexSeats(table) {
-  for (const [id, seat] of remoteSeats) if (seat.table === table.id) remoteSeats.delete(id)
+  const wasHere = []
+  for (const [id, seat] of remoteSeats) {
+    if (seat.table !== table.id) continue
+    remoteSeats.delete(id)
+    wasHere.push(id)
+  }
   table.seats.forEach((s, i) => {
     if (!s) return
     const dancing = table.phase === 'ended' && table.winner === s.id
     remoteSeats.set(s.id, { ...seatPosition(table.id, i), table: table.id, dancing })
   })
+  // Whoever stood up leaves their duel behind (a knockout's flight included).
+  for (const id of wasHere) if (!remoteSeats.has(id)) actionFx.delete(id)
 }
 
 /** Synced TableState -> the plain shape the UI uses, with a local-clock deadline. */
@@ -437,6 +453,11 @@ function applyTable(id, t) {
     turn: t.turn || null,
     winner: t.winner || null,
     endsAt: t.endsAt ? t.endsAt - clockOffset : 0,
+    /** Each seat's plate ('0' uneaten, '1' eaten, '2' slap found, '3' golden eaten). */
+    plates: [t.plate0 || '', t.plate1 || ''],
+    hearts: [t.hearts0, t.hearts1],
+    /** Where each seat hid its slaps (base-36 cells), once the duel has ended. */
+    shown: [t.shown0 || '', t.shown1 || ''],
   }
   indexSeats(table)
   useGame.setState((s) => ({ tables: { ...s.tables, [id]: table } }))
@@ -456,12 +477,78 @@ function positionOf(id) {
   return remotes.get(id) || null
 }
 
+/** A seated player's seat ({ x, z, ry, table }), local or remote, or null. */
+function seatOf(id) {
+  if (id === useGame.getState().selfId) {
+    const m = useGame.getState().match
+    return localPlayer.seat && m ? { ...localPlayer.seat, table: m.table } : null
+  }
+  return remoteSeats.get(id) || null
+}
+
+/** Where a seated player's head is, roughly: over the seat, leant back a little. */
+function headOf(seat) {
+  return {
+    x: seat.x - Math.sin(seat.ry) * SEATED_BACK,
+    y: SEATED_HEAD_Y,
+    z: seat.z - Math.cos(seat.ry) * SEATED_BACK,
+  }
+}
+
 /** The server's confirmations come as toasts; each kind gets its sound. */
 function playToastSound(text) {
-  if (/not enough|need \$|busy|full|walk closer|already|too slow|out of time/i.test(text)) sfx.error()
+  if (/not enough|need \$|busy|full|walk closer|already|too slow|out of time|nothing left/i.test(text)) sfx.error()
   else if (/bought|unlocked|claimed/i.test(text)) sfx.buy()
   else if (/quest complete|gift|reward|streak/i.test(text)) sfx.reward()
-  else if (/hint|their number is/i.test(text)) sfx.turn()
+}
+
+/** actionFx is keyed by session id, except the local player's entry. */
+const fxKey = (id) => (id === useGame.getState().selfId ? SELF_ANCHOR : id)
+
+/**
+ * A slap anywhere in the room: the plate's owner leans over and slaps the eater
+ * with their own hand (see seatPose); when it lands, the eater is knocked aside,
+ * stars burst off their cheek and, if it was you, the screen edges flush red.
+ */
+function playSlap(id, by, now, final = false) {
+  const seat = seatOf(id)
+  if (!seat) return
+  const other = by ? seatOf(by) : null
+  // From the slapped player towards the slapper (the other seat at the table).
+  let dx = other ? other.x - seat.x : Math.cos(seat.ry)
+  let dz = other ? other.z - seat.z : -Math.sin(seat.ry)
+  const len = Math.hypot(dx, dz) || 1
+  dx /= len
+  dz /= len
+  // Is the slapper on the slapped player's right? Then the hit knocks them left,
+  // and the slapper (who faces the same way) reaches over with their left hand.
+  const right = -Math.cos(seat.ry) * dx + Math.sin(seat.ry) * dz > 0
+  if (other) {
+    const key = fxKey(by)
+    actionFx.set(key, { ...actionFx.get(key), slapping: now, dx: -dx, dz: -dz, arm: right ? -1 : 1 })
+  }
+  const key = fxKey(id)
+  const hit = { slap: now + SLAP_IMPACT_MS, side: right ? -1 : 1 }
+  if (final) {
+    // The last slap knocks them out of the chair: away from the slapper, a little
+    // back from the table.
+    let ax = -dx - Math.sin(seat.ry) * FLY_BACK
+    let az = -dz - Math.cos(seat.ry) * FLY_BACK
+    const n = Math.hypot(ax, az) || 1
+    ax /= n
+    az /= n
+    Object.assign(hit, { fly: now + SLAP_IMPACT_MS, ax, az })
+  }
+  actionFx.set(key, { ...actionFx.get(key), ...hit })
+
+  setTimeout(() => {
+    if (!getSettings().particles) return
+    const head = headOf(seat)
+    effectQueue.push({ kind: 'sparks', x: head.x + dx * 0.25, y: head.y, z: head.z + dz * 0.25 })
+  }, SLAP_IMPACT_MS)
+  if (id === useGame.getState().selfId) {
+    useGame.setState({ flash: { kind: 'slap', at: now, delay: SLAP_IMPACT_MS, until: now + SLAP_IMPACT_MS + 800 } })
+  }
 }
 
 const handlers = {
@@ -483,19 +570,38 @@ const handlers = {
     sfx.setDucked(Boolean(next))
     localPlayer.seat = next ? { ...seatPosition(next.table, next.seat), dancing: Boolean(next.won) } : null
 
+    let turnSplash = useGame.getState().turnSplash
     if (next && prev) {
-      if (next.phase === 'choosing' && prev.phase !== 'choosing') sfx.go()
-      if (next.myTurn && !prev.myTurn) sfx.turn()
+      if (next.phase === 'hiding' && prev.phase !== 'hiding') sfx.go()
+      // Your turn: a chime and the big "YOUR TURN!" splash, just as the last bite's
+      // reveal card clears (it is your turn from then on).
+      if (next.myTurn && !prev.myTurn) {
+        const now = Date.now()
+        const { reveal } = useGame.getState()
+        const at = reveal && reveal.until > now ? reveal.until : now
+        setTimeout(() => sfx.turn(), at - now)
+        turnSplash = { at, until: at + TURN_SPLASH_MS }
+      }
     }
-    useGame.setState({ match: next })
+    if (!next?.myTurn) turnSplash = null
+    // Standing up leaves the duel behind (a knockout's flight included).
+    if (!next) actionFx.delete(SELF_ANCHOR)
+    // A fresh hiding phase (or leaving the table) starts with no chips picked.
+    const freshHide = next?.phase === 'hiding' && prev?.phase !== 'hiding'
+    useGame.setState({
+      match: next,
+      turnSplash,
+      ...(freshHide || !next ? { draft: [], reveal: null } : {}),
+      // The quit popup only makes sense mid-duel.
+      ...(next?.phase !== 'eating' ? { quitAsk: false } : {}),
+    })
   },
 
-  /** Lost a duel: back to the lobby spawn point, visible again. */
+  /** Lost a duel: back to the lobby spawn point. */
   respawn(msg) {
     localPlayer.seat = null
     localPlayer.position.set(msg.x, msg.y, msg.z)
     localPlayer.ry = msg.ry
-    localPlayer.hiddenUntil = 0
     localPlayer.snapCamera = true
   },
 
@@ -503,18 +609,46 @@ const handlers = {
     useGame.setState({ profile: withProfileDeadlines(msg.profile) })
   },
 
-  /** A guess landing, then its Higher / Lower answer, for the reveal card. */
+  /** A bite at your table (drumroll), then what was in the chip, for the reveal card. */
   duel(msg) {
     const now = Date.now()
-    if (msg.t === 'guessed') {
+    if (msg.t === 'bite') {
       sfx.drum()
-      useGame.setState({ reveal: { mine: msg.mine, n: msg.n, answer: null, until: now + 5000 } })
-    } else if (msg.t === 'answer') {
-      if (msg.answer === 'higher') sfx.higher()
-      else if (msg.answer === 'lower') sfx.lower()
-      // A correct guess hands over to the result banner quickly.
-      const hold = msg.answer === 'correct' ? 900 : REVEAL_HOLD_MS
-      useGame.setState({ reveal: { mine: msg.mine, n: msg.n, answer: msg.answer, until: now + hold } })
+      useGame.setState({ reveal: { mine: msg.mine, cell: msg.cell, kind: null, hearts: null, until: now + 5000 } })
+    } else if (msg.t === 'outcome') {
+      if (msg.kind === 'safe') sfx.crunch()
+      else if (msg.kind === 'slap') sfx.slap()
+      else if (msg.kind === 'golden') sfx.golden()
+      const reveal = { mine: msg.mine, cell: msg.cell, kind: msg.kind, hearts: msg.hearts, until: now + REVEAL_HOLD_MS }
+      useGame.setState(
+        msg.kind === 'golden' && msg.mine
+          ? { reveal, flash: { kind: 'golden', at: now, delay: 0, until: now + 900 } }
+          : { reveal },
+      )
+    }
+  },
+
+  /**
+   * Table actions anywhere in the room, so every duel looks alive from the plaza:
+   * a bite (hand to mouth), a slap (the owner slaps the eater) or a golden chip.
+   */
+  fx(msg) {
+    const now = Date.now()
+    const key = fxKey(msg.id)
+    if (msg.kind === 'eat') {
+      actionFx.set(key, { ...actionFx.get(key), eat: now })
+      return
+    }
+    if (msg.kind === 'slap') {
+      playSlap(msg.id, msg.by, now, Boolean(msg.final))
+      return
+    }
+    if (msg.kind === 'golden' && getSettings().particles) {
+      const seat = seatOf(msg.id)
+      if (seat) {
+        const head = headOf(seat)
+        effectQueue.push({ kind: 'sparks', x: head.x, y: head.y, z: head.z })
+      }
     }
   },
 
@@ -533,8 +667,9 @@ const handlers = {
 
   /** Levelled up: a banner, a sparkle sound and confetti over your head. */
   levelUp(msg) {
-    // Shown after the duel result has had its moment.
-    const delay = useGame.getState().result ? 2200 : 0
+    // Shown after the duel result has had its moment (it is sent just before the result).
+    const { result, match } = useGame.getState()
+    const delay = result || match ? 3000 : 0
     setTimeout(() => {
       sfx.reward()
       if (getSettings().particles) {
@@ -546,33 +681,50 @@ const handlers = {
   },
 
   result(msg) {
-    const { selfId, match } = useGame.getState()
-    const now = Date.now()
-
-    // The particle system only exists on presets that allow particles; queuing
-    // without it would grow the queue forever.
-    if (getSettings().particles) {
-      const winnerPos = msg.winner && positionOf(msg.winner)
-      if (winnerPos) effectQueue.push({ kind: 'confetti', x: winnerPos.x, y: 2.5, z: winnerPos.z })
-      const loserPos = msg.loser && positionOf(msg.loser)
-      if (loserPos) effectQueue.push({ kind: 'break', x: loserPos.x, y: 1, z: loserPos.z })
+    // The winner dances only once every slap has landed: the knockout slap that
+    // just started, or the slaps a quitter is about to get.
+    if (msg.winner) {
+      const p = msg.punish
+      const slapsFor = p ? (p.first + (p.count - 1) * p.gap) * 1000 : msg.reason === 'slapped' ? 0 : -1
+      if (slapsFor >= 0) {
+        const key = fxKey(msg.winner)
+        actionFx.set(key, { ...actionFx.get(key), danceAt: Date.now() + slapsFor + SLAPPING_MS + 300 })
+      }
     }
-    if (msg.loser === selfId) localPlayer.hiddenUntil = now + LOSS_HIDE_MS
-    else if (msg.loser) hiddenUntil.set(msg.loser, now + LOSS_HIDE_MS)
-
-    if (msg.winner === selfId || msg.loser === selfId) {
-      const win = msg.winner === selfId
-      const mySeat = match?.seat ?? 0
-      win ? sfx.win() : sfx.lose()
-      useGame.setState({
-        result: {
-          win,
-          reward: win ? msg.reward : msg.consolation || 0,
-          theirNumber: msg.numbers[1 - mySeat],
-          reason: msg.reason,
-          until: now + 3800,
-        },
-      })
-    }
+    // A knockout's banner waits for the slap to land.
+    const delay = msg.reason === 'slapped' ? RESULT_AFTER_SLAP_MS : 0
+    const mySeat = useGame.getState().match?.seat ?? 0
+    setTimeout(() => showResult(msg, mySeat), delay)
   },
+}
+
+/** The duel result: confetti over the winner, and your banner if it was your duel. */
+function showResult(msg, mySeat) {
+  const { selfId } = useGame.getState()
+  const now = Date.now()
+
+  // The particle system only exists on presets that allow particles; queuing
+  // without it would grow the queue forever.
+  if (getSettings().particles) {
+    const winnerPos = msg.winner && positionOf(msg.winner)
+    if (winnerPos) effectQueue.push({ kind: 'confetti', x: winnerPos.x, y: 2.5, z: winnerPos.z })
+  }
+
+  if (msg.winner === selfId || msg.loser === selfId) {
+    const win = msg.winner === selfId
+    win ? sfx.win() : sfx.lose()
+    useGame.setState({
+      result: {
+        win,
+        reward: win ? msg.reward : msg.consolation || 0,
+        /** What a quitter paid (the winner's reward already includes it). */
+        penalty: msg.penalty || 0,
+        theirSlaps: msg.slaps[1 - mySeat] || [],
+        reason: msg.reason,
+        // A quitter's banner stays up through their slaps (and out of their way).
+        punished: Boolean(msg.punish),
+        until: now + (msg.punish ? 5200 : 4200),
+      },
+    })
+  }
 }

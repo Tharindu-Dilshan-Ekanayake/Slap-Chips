@@ -12,10 +12,10 @@ import {
 
 import { DEFAULT_PROPORTIONS } from '../bloxity/store'
 import { useGame } from '../net/gameStore'
-import { avatarAnchors, hiddenUntil, localPlayer, remoteEmotes, remotes, remoteSeats } from '../net/liveState'
+import { actionFx, avatarAnchors, localPlayer, remoteEmotes, remotes, remoteSeats } from '../net/liveState'
 import { mergedBoxes } from './instancing'
 import Nametag from './Nametag'
-import { PLAYER_HEIGHT } from './layout'
+import { FLOOR, PLAYER_HEIGHT } from './layout'
 import PlayerAvatar from './PlayerAvatar'
 import { getSettings } from './quality'
 import { skipWhenHidden } from './sceneGraph'
@@ -26,7 +26,7 @@ import { useDisposable } from './useDisposable'
 const INTERP_S = 0.1
 const MAX_PLAYERS = 20
 
-/** id -> { group, visual, full, active, hidden, isFull, dist } */
+/** id -> { group, visual, full, active, isFull, dist } */
 const registry = new Map()
 const ordered = []
 const byDistance = (a, b) => a.dist - b.dist
@@ -98,7 +98,6 @@ const RemotePlayer = memo(function RemotePlayer({ meta }) {
       visual: visualRef.current,
       full: fullRef.current,
       active: false,
-      hidden: false,
       isFull: false,
       dist: 0,
       id,
@@ -130,7 +129,6 @@ const RemotePlayer = memo(function RemotePlayer({ meta }) {
     }
     group.visible = true
     entry.active = true
-    entry.hidden = (hiddenUntil.get(id) || 0) > Date.now()
 
     const m = motionRef.current
     m.time += delta
@@ -141,7 +139,7 @@ const RemotePlayer = memo(function RemotePlayer({ meta }) {
 
     if (seat) {
       group.position.set(seat.x, 0, seat.z)
-      poseAtSeat(visual, tagRef.current, seat, m, delta)
+      poseAtSeat(visual, tagRef.current, seat, m, delta, actionFx.get(id))
     } else {
       if (m.seated || m.danceT != null) clearSeatPose(visual, tagRef.current, m)
       r.alpha = Math.min(1, r.alpha + delta / INTERP_S)
@@ -239,9 +237,8 @@ export function RemotePlayers() {
     for (let i = 0; i < ordered.length; i += 1) {
       const e = ordered[i]
       const full = i < settings.maxFullAvatars
-      e.full.visible = full && !e.hidden
+      e.full.visible = full
       e.tagGate.show = i < settings.maxNames
-      if (e.hidden) continue
 
       if (!full) {
         _obj.position.copy(e.group.position)
@@ -253,7 +250,7 @@ export function RemotePlayers() {
         proxies += 1
       }
 
-      _obj.position.set(e.group.position.x, 0.02, e.group.position.z)
+      _obj.position.set(e.group.position.x, FLOOR.blob, e.group.position.z)
       _obj.rotation.set(0, 0, 0)
       _obj.updateMatrix()
       blob.setMatrixAt(blobs, _obj.matrix)
@@ -261,8 +258,8 @@ export function RemotePlayers() {
     }
 
     // Without realtime shadows the local player gets a blob too.
-    if (!settings.shadows && Date.now() >= localPlayer.hiddenUntil) {
-      _obj.position.set(localPlayer.position.x, 0.02, localPlayer.position.z)
+    if (!settings.shadows) {
+      _obj.position.set(localPlayer.position.x, FLOOR.blob, localPlayer.position.z)
       _obj.rotation.set(0, 0, 0)
       _obj.updateMatrix()
       blob.setMatrixAt(blobs, _obj.matrix)

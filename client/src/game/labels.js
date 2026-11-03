@@ -84,6 +84,10 @@ function drawEntry(entry) {
   const scale = Math.min(1, (MAX_WIDTH - PADDING * 2) / Math.max(1, width))
   canvas.width = Math.min(MAX_WIDTH, Math.ceil(width * scale + PADDING * 2))
   canvas.height = Math.ceil(height * scale)
+  // A sprite drawn before this (still blank) may have uploaded the texture at the
+  // canvas's old size, and three keeps a texture's GPU size once it is allocated:
+  // let go of that copy so the next upload allocates the new size.
+  entry.texture.dispose()
 
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'

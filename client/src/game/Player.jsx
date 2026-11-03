@@ -4,7 +4,7 @@ import { Quaternion, Vector3 } from 'three'
 
 import { sfx } from '../audio/sfx'
 import { useGame } from '../net/gameStore'
-import { avatarAnchors, localPlayer, SELF_ANCHOR, touchInput } from '../net/liveState'
+import { actionFx, avatarAnchors, localPlayer, SELF_ANCHOR, touchInput } from '../net/liveState'
 import { COLLIDERS, PLAYER_HEIGHT, WORLD_HALF } from './layout'
 import Nametag from './Nametag'
 import PlayerAvatar from './PlayerAvatar'
@@ -29,35 +29,58 @@ const _targetQuat = new Quaternion()
 const _up = new Vector3(0, 1, 0)
 
 /**
- * Pushes a circle of `RADIUS` at (pos.x, pos.z) out of every collider box. The world
- * is a flat island with a handful of static boxes, so this replaces a full physics
+ * Pushes a circle of `RADIUS` at (pos.x, pos.z) out of every collider: turned boxes
+ * (the tables around the ring, the boards) and circles (the fountain). The world is
+ * a flat island with a handful of static shapes, so this replaces a full physics
  * engine (and its ~2 MB of WASM) with a few comparisons per frame.
  */
 function resolveCollisions(pos) {
   for (const c of COLLIDERS) {
-    const cx = Math.min(Math.max(pos.x, c.minX), c.maxX)
-    const cz = Math.min(Math.max(pos.z, c.minZ), c.maxZ)
-    const dx = pos.x - cx
-    const dz = pos.z - cz
+    const ox = pos.x - c.x
+    const oz = pos.z - c.z
+
+    if (c.r !== undefined) {
+      const d = Math.hypot(ox, oz)
+      const min = c.r + RADIUS
+      if (d >= min) continue
+      if (d > 1e-6) {
+        pos.x = c.x + (ox / d) * min
+        pos.z = c.z + (oz / d) * min
+      } else {
+        pos.z = c.z + min
+      }
+      continue
+    }
+
+    // Into the box's own frame (the inverse of its yaw).
+    let lx = ox * c.c - oz * c.s
+    let lz = ox * c.s + oz * c.c
+    const cx = Math.min(Math.max(lx, -c.hw), c.hw)
+    const cz = Math.min(Math.max(lz, -c.hd), c.hd)
+    const dx = lx - cx
+    const dz = lz - cz
     const d2 = dx * dx + dz * dz
     if (d2 >= RADIUS * RADIUS) continue
 
     if (d2 > 1e-8) {
       const d = Math.sqrt(d2)
-      pos.x = cx + (dx / d) * RADIUS
-      pos.z = cz + (dz / d) * RADIUS
+      lx = cx + (dx / d) * RADIUS
+      lz = cz + (dz / d) * RADIUS
     } else {
       // Centre is inside the box: leave by the nearest face.
-      const left = pos.x - c.minX
-      const right = c.maxX - pos.x
-      const back = pos.z - c.minZ
-      const front = c.maxZ - pos.z
+      const left = lx + c.hw
+      const right = c.hw - lx
+      const back = lz + c.hd
+      const front = c.hd - lz
       const m = Math.min(left, right, back, front)
-      if (m === left) pos.x = c.minX - RADIUS
-      else if (m === right) pos.x = c.maxX + RADIUS
-      else if (m === back) pos.z = c.minZ - RADIUS
-      else pos.z = c.maxZ + RADIUS
+      if (m === left) lx = -c.hw - RADIUS
+      else if (m === right) lx = c.hw + RADIUS
+      else if (m === back) lz = -c.hd - RADIUS
+      else lz = c.hd + RADIUS
     }
+    // Back to world space.
+    pos.x = c.x + lx * c.c + lz * c.s
+    pos.z = c.z - lx * c.s + lz * c.c
   }
   const edge = WORLD_HALF - RADIUS
   pos.x = Math.min(edge, Math.max(-edge, pos.x))
@@ -104,7 +127,6 @@ export function Player({ onAvatarReady }) {
     const motion = motionRef.current
     motion.time += delta
 
-    visual.visible = Date.now() >= localPlayer.hiddenUntil
 
     // --- At a table: pinned to the chair (or dancing on it after a win) ----------
     const seat = localPlayer.seat
@@ -115,7 +137,7 @@ export function Player({ onAvatarReady }) {
       localPlayer.speed = 0
       localPlayer.grounded = true
       group.position.copy(pos)
-      poseAtSeat(visual, tagRef.current, seat, motion, delta)
+      poseAtSeat(visual, tagRef.current, seat, motion, delta, actionFx.get(SELF_ANCHOR))
       atSeat.current = true
       localPlayer.emote = null
       motion.emote = null

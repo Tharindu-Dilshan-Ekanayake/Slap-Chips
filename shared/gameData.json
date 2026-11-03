@@ -1,6 +1,6 @@
 {
   "bloxity": {
-    "gameSlug": "guess-my-number",
+    "gameSlug": "slap-chips",
     "roomName": "game",
     "leaderboards": [
       {
@@ -38,72 +38,87 @@
     ]
   },
   "roomSize": 20,
-  "numberMin": 1,
-  "numberMax": 100,
+  "chips": {
+    "cols": 3,
+    "rows": 3,
+    "slaps": 3,
+    "hearts": 3,
+    "goldenCash": 50
+  },
+  "forfeit": {
+    "penalty": 50,
+    "slaps": 3,
+    "slapFirst": 0.4,
+    "slapGap": 1.05
+  },
   "winReward": 200,
   "timing": {
     "countdown": 3,
-    "choose": 20,
-    "turn": 15,
-    "results": 4,
-    "guessReveal": 1.2,
-    "loserRespawn": 2
+    "hide": 20,
+    "turn": 12,
+    "results": 5,
+    "bite": 1.1,
+    "loserRespawn": 3.6
   },
   "world": {
     "half": 31,
-    "spawn": [0, 0, 23]
+    "spawn": [0, 0, 25.5]
   },
   "table": {
     "width": 3.6,
-    "depth": 1.3,
+    "depth": 1.7,
     "height": 0.82,
-    "seatX": 0.8,
-    "seatZ": 1.0,
+    "seatX": 0.9,
+    "seatZ": 1.2,
     "sitRange": 4
   },
   "tables": [
-    { "id": 1, "x": -17, "z": -4 },
-    { "id": 2, "x": -8.5, "z": -4 },
-    { "id": 3, "x": 0, "z": -4 },
-    { "id": 4, "x": 8.5, "z": -4 },
-    { "id": 5, "x": 17, "z": -4 },
-    { "id": 6, "x": -17, "z": 6 },
-    { "id": 7, "x": -8.5, "z": 6 },
-    { "id": 8, "x": 0, "z": 6 },
-    { "id": 9, "x": 8.5, "z": 6 },
-    { "id": 10, "x": 17, "z": 6 }
+    { "id": 1, "x": 3.86, "z": 11.89, "ry": -2.8274 },
+    { "id": 2, "x": 10.11, "z": 7.35, "ry": -2.1991 },
+    { "id": 3, "x": 12.5, "z": 0, "ry": -1.5708 },
+    { "id": 4, "x": 10.11, "z": -7.35, "ry": -0.9425 },
+    { "id": 5, "x": 3.86, "z": -11.89, "ry": -0.3142 },
+    { "id": 6, "x": -3.86, "z": -11.89, "ry": 0.3142 },
+    { "id": 7, "x": -10.11, "z": -7.35, "ry": 0.9425 },
+    { "id": 8, "x": -12.5, "z": 0, "ry": 1.5708 },
+    { "id": 9, "x": -10.11, "z": 7.35, "ry": 2.1991 },
+    { "id": 10, "x": -3.86, "z": 11.89, "ry": 2.8274 }
   ],
   "leaderboards": [
     {
       "id": "levels",
       "title": "TOP LEVELS ⭐",
       "format": "level",
-      "x": -18,
-      "z": -16
+      "x": 11.12,
+      "z": -21.83,
+      "ry": -0.4712
     },
     {
       "id": "streaks",
       "title": "TOP STREAKS 🔥",
-      "x": -6,
-      "z": -16
+      "x": 3.83,
+      "z": -24.2,
+      "ry": -0.1571
     },
     {
       "id": "wins",
       "title": "TOP WINS 🏆",
-      "x": 6,
-      "z": -16
+      "x": -3.83,
+      "z": -24.2,
+      "ry": 0.1571
     },
     {
       "id": "playtime",
       "title": "MOST PLAYED ⏱️",
       "format": "duration",
-      "x": 18,
-      "z": -16
+      "x": -11.12,
+      "z": -21.83,
+      "ry": 0.4712
     }
   ],
   "emoteShop": {
-    "x": -26.5,
-    "z": 1
+    "x": -24,
+    "z": 0
   },
   "chairs": [
     {
@@ -119,7 +134,7 @@
       "rarity": "common",
       "price": 100,
       "color": "#8a96a8",
-      "shop": [24.6, -10]
+      "shop": [16.97, 16.97]
     },
     {
       "id": "picnic",
@@ -127,7 +142,7 @@
       "rarity": "common",
       "price": 300,
       "color": "#e8504a",
-      "shop": [28.4, -10]
+      "shop": [19.66, 13.77]
     },
     {
       "id": "nature",
@@ -135,7 +150,7 @@
       "rarity": "uncommon",
       "price": 800,
       "color": "#2fd14f",
-      "shop": [24.6, -5]
+      "shop": [21.75, 10.14]
     },
     {
       "id": "candy",
@@ -143,7 +158,7 @@
       "rarity": "uncommon",
       "price": 1200,
       "color": "#ff7fc8",
-      "shop": [28.4, -5]
+      "shop": [23.18, 6.21]
     },
     {
       "id": "storm",
@@ -151,7 +166,7 @@
       "rarity": "rare",
       "price": 2000,
       "color": "#7fe3ff",
-      "shop": [24.6, 0]
+      "shop": [23.91, 2.09]
     },
     {
       "id": "ocean",
@@ -159,7 +174,7 @@
       "rarity": "rare",
       "price": 3000,
       "color": "#2f7dff",
-      "shop": [28.4, 0]
+      "shop": [23.91, -2.09]
     },
     {
       "id": "lava",
@@ -167,7 +182,7 @@
       "rarity": "epic",
       "price": 5000,
       "color": "#ff5a1f",
-      "shop": [24.6, 5]
+      "shop": [23.18, -6.21]
     },
     {
       "id": "golden",
@@ -176,7 +191,7 @@
       "price": 9000,
       "color": "#ffc93d",
       "style": "throne",
-      "shop": [28.4, 5]
+      "shop": [21.75, -10.14]
     },
     {
       "id": "void",
@@ -185,7 +200,7 @@
       "price": 16000,
       "color": "#9b3dff",
       "style": "throne",
-      "shop": [24.6, 10]
+      "shop": [19.66, -13.77]
     },
     {
       "id": "diamond",
@@ -194,26 +209,26 @@
       "price": 30000,
       "color": "#8ff4ff",
       "style": "throne",
-      "shop": [28.4, 10]
+      "shop": [16.97, -16.97]
     }
   ],
   "emotes": [
     {
-      "id": "higher",
-      "label": "HIGHER",
-      "icon": "⬆️",
+      "id": "yum",
+      "label": "YUM",
+      "icon": "😋",
       "price": 0
     },
     {
-      "id": "lower",
-      "label": "LOWER",
-      "icon": "⬇️",
+      "id": "ouch",
+      "label": "OUCH",
+      "icon": "😵",
       "price": 0
     },
     {
-      "id": "close",
-      "label": "CLOSE",
-      "icon": "😬",
+      "id": "noway",
+      "label": "NO WAY",
+      "icon": "😱",
       "price": 0
     },
     {
@@ -283,12 +298,6 @@
       "price": 3500
     },
     {
-      "id": "waytooclose",
-      "label": "WAY TOO CLOSE",
-      "icon": "😬",
-      "price": 3500
-    },
-    {
       "id": "genius",
       "label": "GENIUS",
       "icon": "🧠",
@@ -305,6 +314,18 @@
       "label": "REMATCH?",
       "icon": "🔁",
       "price": 600
+    },
+    {
+      "id": "crunchy",
+      "label": "SO CRUNCHY",
+      "icon": "🥔",
+      "price": 1200
+    },
+    {
+      "id": "spicy",
+      "label": "TOO SPICY",
+      "icon": "🌶️",
+      "price": 3500
     }
   ],
   "passes": [
@@ -338,10 +359,6 @@
       "lol"
     ]
   },
-  "powers": {
-    "hint": 150,
-    "reveal": 600
-  },
   "quests": [
     {
       "id": "play3",
@@ -372,11 +389,11 @@
       "reward": 1200
     },
     {
-      "id": "quickwin",
-      "label": "Win Within 3 Guesses",
-      "event": "quickwin",
+      "id": "flawless",
+      "label": "Win Without Losing A Heart",
+      "event": "flawless",
       "goal": 1,
-      "reward": 700
+      "reward": 800
     },
     {
       "id": "streak3",
@@ -386,18 +403,25 @@
       "reward": 900
     },
     {
+      "id": "crunch10",
+      "label": "Eat 10 Safe Chips",
+      "event": "crunch",
+      "goal": 10,
+      "reward": 400
+    },
+    {
+      "id": "golden1",
+      "label": "Find A Golden Chip",
+      "event": "golden",
+      "goal": 1,
+      "reward": 600
+    },
+    {
       "id": "emote5",
       "label": "Use 5 Emotes",
       "event": "emote",
       "goal": 5,
       "reward": 250
-    },
-    {
-      "id": "hint1",
-      "label": "Use a Hint",
-      "event": "hint",
-      "goal": 1,
-      "reward": 200
     }
   ],
   "gift": {
@@ -486,25 +510,25 @@
   "titles": [
     {
       "id": "t_rookie",
-      "name": "Rookie Guesser",
+      "name": "Chip Rookie",
       "color": "#c8d0dc",
       "level": 5
     },
     {
       "id": "t_ninja",
-      "name": "Number Ninja",
+      "name": "Crunch Ninja",
       "color": "#5cff5c",
       "level": 10
     },
     {
       "id": "t_reader",
-      "name": "Mind Reader",
+      "name": "Slap Dodger",
       "color": "#4fd8ff",
       "level": 20
     },
     {
       "id": "t_master",
-      "name": "Guess Master",
+      "name": "Chip Master",
       "color": "#ffb21e",
       "level": 35
     },
@@ -516,35 +540,35 @@
     },
     {
       "id": "t_lucky",
-      "name": "Lucky Guess",
+      "name": "Lucky Muncher",
       "color": "#7dff3a",
       "price": 500,
       "rarity": "common"
     },
     {
       "id": "t_brain",
-      "name": "Big Brain",
+      "name": "Snack Attack",
       "color": "#ff7fc8",
       "price": 2000,
       "rarity": "uncommon"
     },
     {
       "id": "t_pro",
-      "name": "Higher Lower Pro",
+      "name": "Iron Cheeks",
       "color": "#2f9bff",
       "price": 4000,
       "rarity": "rare"
     },
     {
       "id": "t_psychic",
-      "name": "Psychic",
+      "name": "Slap Psychic",
       "color": "#b44dff",
       "price": 10000,
       "rarity": "epic"
     },
     {
       "id": "t_oracle",
-      "name": "The Oracle",
+      "name": "The Untouchable",
       "color": "#ffd23d",
       "price": 25000,
       "rarity": "legendary",

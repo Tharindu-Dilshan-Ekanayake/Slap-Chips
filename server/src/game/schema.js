@@ -4,7 +4,7 @@ const { schema, t } = require('@colyseus/schema')
  * Synchronised room state. Colyseus diffs it and sends only changed fields to every
  * client at the room's patch rate.
  *
- * Only public information lives here. Each player's secret number, their duel
+ * Only public information lives here. Where each player hid their slaps, their duel
  * view and their profile (cash, inventory) go to that player alone as messages.
  */
 
@@ -39,19 +39,30 @@ const PlayerState = schema(
 
 const TableState = schema(
   {
-    /** 'waiting' | 'countdown' | 'choosing' | 'guessing' | 'ended' */
+    /** 'waiting' | 'countdown' | 'hiding' | 'eating' | 'ended' */
     phase: t.string(),
     /** Session ids in the two seats ('' when empty), and each one's equipped chair. */
     seat0: t.string(),
     seat1: t.string(),
     chair0: t.string(),
     chair1: t.string(),
-    /** Session id whose turn it is while guessing. */
+    /** Session id whose turn it is to eat. */
     turn: t.string(),
     /** Session id of the duel's winner while the result shows: they dance on their chair. */
     winner: t.string(),
     /** Server epoch ms when the current phase times out (0 when it doesn't). */
     endsAt: t.float64(),
+    /**
+     * Each seat's plate, one character per chip (see Table.js): '0' uneaten, '1' eaten
+     * (safe), '2' a slap found, '3' the golden chip eaten. Public: everyone sees chips go.
+     */
+    plate0: t.string(),
+    plate1: t.string(),
+    hearts0: t.uint8(),
+    hearts1: t.uint8(),
+    /** Where each seat hid its slaps (a base-36 cell per char), only once the duel has ended. */
+    shown0: t.string(),
+    shown1: t.string(),
   },
   'Table',
 )

@@ -142,15 +142,10 @@ class Session {
         return this.onSit(msg, now)
       case 'leave':
         return this.seat?.table.leave(this, now)
-      case 'pick':
-        return this.seat?.table.pick(this, msg.n, now)
-      case 'guess':
-        return this.seat?.table.guess(this, msg.n, now)
-      case 'power': {
-        const err = this.seat ? this.seat.table.power(this, msg.kind, now) : 'Sit at a table first'
-        if (err) this.toast(err)
-        return undefined
-      }
+      case 'hide':
+        return this.seat?.table.hide(this, msg.cells, now)
+      case 'eat':
+        return this.seat?.table.eat(this, msg.cell, now)
       case 'emote':
         return this.onEmote(msg, now)
       case 'buy':

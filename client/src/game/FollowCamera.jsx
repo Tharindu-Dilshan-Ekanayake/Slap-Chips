@@ -4,8 +4,8 @@ import { Vector3 } from 'three'
 
 import { usePlatform } from '../bloxity/platform'
 import { useGame } from '../net/gameStore'
-import { localPlayer } from '../net/liveState'
-import { DATA, TABLE } from './layout'
+import { actionFx, localPlayer, SELF_ANCHOR } from '../net/liveState'
+import { TABLE, tableById, tableLocal } from './layout'
 
 /** How high above the player's feet the camera aims. */
 const LOOK_HEIGHT = 2
@@ -34,12 +34,19 @@ const POSITION_SMOOTHING = 4
 const LOOK_SMOOTHING = 8
 const TABLE_SMOOTHING = 3
 
-/** Seated view: across the table from the two players, looking at them. */
-const TABLE_CAM_BACK = 3.1
-const TABLE_CAM_HEIGHT = 1.9
-const TABLE_LOOK_HEIGHT = 1.15
-/** Looks higher while the winner dances up on the table. */
+/**
+ * Seated view: across the table from the two players, high enough to see down onto
+ * both plates of chips, with the players behind them.
+ */
+const TABLE_CAM_BACK = 2.75
+const TABLE_CAM_HEIGHT = 2.75
+const TABLE_LOOK_HEIGHT = 1.0
+/** Where the view aims, in the table's frame (+Z is the players' side). */
+const TABLE_LOOK_Z = 0.5
+/** Looks higher (and from further back) while the winner dances up on the table. */
 const TABLE_LOOK_HEIGHT_WIN = 1.9
+/** Extra distance back on portrait screens. */
+const PORTRAIT_BACK = 0.9
 
 const _desired = new Vector3()
 const _target = new Vector3()
@@ -134,14 +141,20 @@ export function FollowCamera() {
     }
   }, [gl])
 
-  useFrame((_state, delta) => {
+  useFrame(({ size }, delta) => {
     const match = useGame.getState().match
-    const table = match && DATA.tables.find((t) => t.id === match.table)
+    const table = match && tableById(match.table)
 
     if (table) {
-      // A winner dancing up on the table is tall: step back so they fit in frame.
-      _desired.set(table.x, match.won ? 2.3 : TABLE_CAM_HEIGHT, table.z - (match.won ? 3.9 : TABLE_CAM_BACK))
-      _target.set(table.x, match.won ? TABLE_LOOK_HEIGHT_WIN : TABLE_LOOK_HEIGHT, table.z + TABLE.seatZ * 0.7)
+      // A winner dancing up on the table is tall: step back so they fit in frame
+      // (once the dance starts: the last slaps are watched up close). A portrait
+      // screen is narrow: step back so both plates fit side by side.
+      const won = match.won && Date.now() >= (actionFx.get(SELF_ANCHOR)?.danceAt || 0)
+      const portrait = size.height > size.width ? PORTRAIT_BACK : 0
+      const [cx, cz] = tableLocal(table, 0, won ? -3.9 : -TABLE_CAM_BACK - portrait)
+      const [lx, lz] = tableLocal(table, 0, won ? TABLE.seatZ * 0.7 : TABLE_LOOK_Z)
+      _desired.set(cx, won ? 2.4 : TABLE_CAM_HEIGHT + portrait * 0.5, cz)
+      _target.set(lx, won ? TABLE_LOOK_HEIGHT_WIN : TABLE_LOOK_HEIGHT, lz)
       const k = 1 - Math.pow(0.001, delta * (TABLE_SMOOTHING / 10) * 3)
       camera.position.lerp(_desired, k)
       lookAt.current.lerp(_target, k)

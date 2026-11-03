@@ -7,7 +7,9 @@
 # Repository setup:
 #   secrets.LEGION_DEPLOY_TOKEN        deploy token from hosting.bloxity.io
 #   secrets.LEGION_DEPLOY_TOKEN_STAGE  (optional) deploy token from hosting.stage.bloxity.io
-#   vars.BLOXITY_GAME_ID               the hosting game id (same on prod and stage)
+#   vars.BLOXITY_GAME_ID               (optional) the hosting game id (same on prod and
+#                                      stage); defaults to shared/gameData.json ->
+#                                      bloxity.gameSlug
 #
 # The client build bakes in no environment, API URL or domain: the platform tells
 # the game where it is at runtime.
@@ -50,7 +52,6 @@ jobs:
       matrix:
         target: ${{ fromJSON(needs.targets.outputs.list) }}
     env:
-      GAME_ID: ${{ vars.BLOXITY_GAME_ID }}
       CHANNEL: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
       API_URL: ${{ matrix.target == 'staging' && 'https://api.stage.bloxity.io' || 'https://api.bloxity.io' }}
       LEGION_URL: ${{ matrix.target == 'staging' && 'https://legion.stage.bloxity.io' || 'https://legion.bloxity.io' }}
@@ -58,16 +59,29 @@ jobs:
       # (an `a && b || c` expression would silently fall back to the prod token).
       DEPLOY_TOKEN: ${{ secrets[matrix.target == 'staging' && 'LEGION_DEPLOY_TOKEN_STAGE' || 'LEGION_DEPLOY_TOKEN'] }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      # The game id: the repository variable BLOXITY_GAME_ID if set, else the game's
+      # own slug from shared/gameData.json, so a missing variable can't stop a deploy.
+      - name: Game id
+        env:
+          FROM_VARIABLE: ${{ vars.BLOXITY_GAME_ID }}
+        run: |
+          id="${FROM_VARIABLE:-$(jq -r '.bloxity.gameSlug // empty' shared/gameData.json)}"
+          echo "Deploying game id: ${id:-<none>}"
+          echo "GAME_ID=$id" >> "$GITHUB_ENV"
 
       - name: Check configuration
         run: |
-          if [ -z "$GAME_ID" ]; then echo "::error::Set the repository variable BLOXITY_GAME_ID"; exit 1; fi
+          if [ -z "$GAME_ID" ]; then
+            echo "::error::No game id. Set the repository variable BLOXITY_GAME_ID (Settings > Secrets and variables > Actions > Variables) or bloxity.gameSlug in shared/gameData.json."
+            exit 1
+          fi
           if [ -z "$DEPLOY_TOKEN" ]; then
             if [ "${{ matrix.target }}" = "staging" ]; then
               echo "::error::LEGION_DEPLOY_TOKEN_STAGE is empty. Staging never falls back to the prod token."
             else
-              echo "::error::LEGION_DEPLOY_TOKEN is empty."
+              echo "::error::LEGION_DEPLOY_TOKEN is empty. Add it under Settings > Secrets and variables > Actions > Secrets (New repository secret), with the deploy token from My Games."
             fi
             exit 1
           fi
@@ -100,7 +114,7 @@ jobs:
             -H "Authorization: Bearer $DEPLOY_TOKEN" -H 'Content-Type: application/json' -d "$body"
 
       # ---- Client (one build: no environment baked in) ----------------------------
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -108,7 +122,8 @@ jobs:
       - name: Build client
         working-directory: client
         env:
-          VITE_BLOXITY_HOSTING_ID: ${{ vars.BLOXITY_GAME_ID }}
+          # Joins through Bloxity's matchmaker for this game (see client/src/net/socket.js).
+          VITE_BLOXITY_HOSTING_ID: ${{ env.GAME_ID }}
         run: npm ci && npm run build
       - name: Upload client
         run: |

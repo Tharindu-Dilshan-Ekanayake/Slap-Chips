@@ -83,8 +83,9 @@ const toWs = (url) => url.replace(/^http/i, 'ws')
 /** Where to open the next connection: `{ url, relayRoomId? }`. */
 async function endpointFor() {
   if (viaMatchmaker()) {
+    // A cold start (the server waking up) takes a few seconds; the loading screen
+    // covers it, so there is nothing to tell the player.
     const resolved = await platform.resolveEndpoint(HOSTING_ID, { userId: hello?.userId })
-    if (resolved.cold) useGame.getState().pushToast('Waking up a server…')
     return { url: resolved.endpoint, relayRoomId: resolved.roomId }
   }
   if (import.meta.env.VITE_SERVER_URL) return { url: import.meta.env.VITE_SERVER_URL }

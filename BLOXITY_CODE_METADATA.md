@@ -1,5 +1,5 @@
 ---
-gameSlug: guess-my-number
+gameSlug: slap-chips
 clientDir: client
 buildCommand: npm ci && npm run build
 distDir: client/dist
@@ -17,6 +17,16 @@ leaderboards:
     label: Best Streak
     order: desc
     mode: best
+    reset: none
+  - id: level
+    label: Level
+    order: desc
+    mode: best
+    reset: none
+  - id: playtime
+    label: Minutes Played
+    order: desc
+    mode: sum
     reset: none
 notApplicable:
   deathScreen: >-
